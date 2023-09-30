@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"image"
-	"os"
+	"image/png"
 	"os/exec"
 	"time"
 
@@ -11,33 +13,38 @@ import (
 	"gocv.io/x/gocv"
 )
 
-func takeScreenshot() (string, error) {
-	_, err := runADBCommand("shell", "screencap", "-p", "/sdcard/screenshot.png")
-	if err != nil {
-		return "", fmt.Errorf("failed to take screenshot: %w", err)
-	}
-
-	temp, err := os.CreateTemp(os.TempDir(), "afkarena-screenshot-*.png")
-	if err != nil {
-		return "", err
-	}
-	log.Debug("Created temp file", "path", temp.Name())
-	defer temp.Close()
-
-	// Pull the screenshot to local machine
-	_, err = runADBCommand("pull", "/sdcard/screenshot.png", temp.Name())
-	if err != nil {
-		return "", fmt.Errorf("failed to pull screenshot: %w", err)
-	}
-
-	return temp.Name(), nil
+func runADBCommand(args ...string) (string, error) {
+	cmd := exec.Command("./platform-tools/adb", args...)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
 }
 
-func findTemplateInImage(mainImagePath, templateImagePath string, confidence float32) (*image.Point, bool) {
+func captureScreen() (image.Image, error) {
+	cmd := exec.Command("./platform-tools/adb", "exec-out", "screencap", "-p")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+
+	img, err := png.Decode(&out)
+	if err != nil {
+		return nil, err
+	}
+	return img, nil
+}
+
+func findInScreen(templateImagePath string, confidence float32) (*image.Point, bool) {
+	screen, err := captureScreen()
+	if err != nil {
+		fmt.Println("Error capturing screen:", err)
+		return nil, false
+	}
 	// Read the main image
-	mainImg := gocv.IMRead(mainImagePath, gocv.IMReadColor)
-	if mainImg.Empty() {
-		log.Error("Error reading main image")
+	mainImg, err := gocv.ImageToMatRGB(screen)
+	if err != nil {
+		fmt.Println("Error reading main image")
 		return nil, false
 	}
 	defer mainImg.Close()
@@ -45,7 +52,7 @@ func findTemplateInImage(mainImagePath, templateImagePath string, confidence flo
 	// Read the template image
 	templateImg := gocv.IMRead(templateImagePath, gocv.IMReadColor)
 	if templateImg.Empty() {
-		log.Error("Error reading template image")
+		fmt.Println("Error reading template image")
 		return nil, false
 	}
 	defer templateImg.Close()
@@ -59,7 +66,6 @@ func findTemplateInImage(mainImagePath, templateImagePath string, confidence flo
 	// Find the maximum value and its location in the result matrix
 	_, maxVal, _, maxLoc := gocv.MinMaxLoc(result)
 
-	log.Info("Template matching result", "maxVal", maxVal, "maxLoc", maxLoc, "template", templateImagePath)
 	if maxVal >= confidence {
 		// Calculate the middle point of the found template
 		midX := maxLoc.X + templateImg.Cols()/2
@@ -70,61 +76,100 @@ func findTemplateInImage(mainImagePath, templateImagePath string, confidence flo
 	return nil, false
 }
 
-func clickXY(x, y int, wait time.Duration) error {
+func findAllInScreen(templateImagePath string, confidence float32) ([]image.Point, bool) {
+	screen, err := captureScreen()
+	if err != nil {
+		fmt.Println("Error capturing screen:", err)
+		return nil, false
+	}
+	// Read the main image
+	mainImg, err := gocv.ImageToMatRGB(screen)
+	if err != nil {
+		fmt.Println("Error reading main image")
+		return nil, false
+	}
+	defer mainImg.Close()
+
+	// Read the template image
+	templateImg := gocv.IMRead(templateImagePath, gocv.IMReadColor)
+	if templateImg.Empty() {
+		fmt.Println("Error reading template image")
+		return nil, false
+	}
+	defer templateImg.Close()
+
+	// Perform template matching
+	result := gocv.NewMat()
+	defer result.Close()
+
+	gocv.MatchTemplate(mainImg, templateImg, &result, gocv.TmCcoeffNormed, gocv.NewMat())
+
+	var locations []image.Point
+
+	for {
+		_, maxVal, _, maxLoc := gocv.MinMaxLoc(result)
+
+		if maxVal >= confidence {
+			// Calculate the middle point of the found template
+			midX := maxLoc.X + templateImg.Cols()/2
+			midY := maxLoc.Y + templateImg.Rows()/2
+			locations = append(locations, image.Point{X: midX, Y: midY})
+
+			for y := maxLoc.Y - 5; y <= maxLoc.Y+templateImg.Rows()+5; y++ {
+				for x := maxLoc.X - 5; x <= maxLoc.X+templateImg.Cols()+5; x++ {
+					result.SetFloatAt(y, x, 0.0)
+				}
+			}
+		} else {
+			break
+		}
+	}
+
+	if len(locations) > 0 {
+		return locations, true
+	}
+
+	return nil, false
+}
+
+func waitUntilFound(ctx context.Context, templateImagePath string, confidence float32, timeout time.Duration) (*image.Point, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("template %s not found within %s", templateImagePath, timeout)
+		default:
+			point, found := findInScreen(templateImagePath, confidence)
+			if found {
+				return point, nil
+			}
+			log.Info("Template not found, waiting...", "template", templateImagePath)
+		}
+	}
+}
+
+func waitUntilFoundAndClick(ctx context.Context, templateImagePath string, confidence float32, timeout time.Duration) error {
+	point, err := waitUntilFound(ctx, templateImagePath, confidence, timeout)
+	if err != nil {
+		return err
+	}
+
+	return clickXY(point.X, point.Y)
+}
+
+func clickXY(x, y int) error {
 	if x > maxX || y > maxY {
 		return fmt.Errorf("x and y must be less than %d and %d respectively", maxX, maxY)
 	}
 	_, err := runADBCommand("shell", "input", "tap", fmt.Sprintf("%d", x), fmt.Sprintf("%d", y))
 
-	time.Sleep(wait)
 	return err
 }
 
-func clickXYDefault(x, y int) error {
-	return clickXY(x, y, defaultWait)
-}
-
 func clickImage(imagePath string, confidence float32) error {
-	screenshotPath, err := takeScreenshot()
-	if err != nil {
-		return err
-	}
-	defer os.Remove(screenshotPath)
-
-	point, found := findTemplateInImage(screenshotPath, fmt.Sprintf("./img/%s.png", imagePath), confidence)
-	if !found {
-		return fmt.Errorf("template not found in image: %s", imagePath)
-	}
-
-	return clickXY(point.X, point.Y, defaultWait)
-}
-
-func clickImageWithRetry(imagePath string, confidence float32, retry int) error {
-	for i := 0; i < retry; i++ {
-		if err := clickImage(imagePath, confidence); err != nil {
-			time.Sleep(time.Second)
-			continue
-		}
-		return nil
-	}
-	return fmt.Errorf("failed to click image: %s", imagePath)
-}
-
-func isVisible(imagePath string) (bool, error) {
-	screenshotPath, err := takeScreenshot()
-	if err != nil {
-		return false, err
-	}
-	defer os.Remove(screenshotPath)
-
-	_, found := findTemplateInImage(screenshotPath, fmt.Sprintf("./img/%s.png", imagePath), 0.80)
-	return found, nil
-}
-
-func runADBCommand(args ...string) (string, error) {
-	cmd := exec.Command("./platform-tools/adb", args...)
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	return waitUntilFoundAndClick(context.Background(), fmt.Sprintf("./img/%s.png", imagePath), confidence, 5*time.Second)
 }
 
 func openAfkArena() error {
@@ -133,8 +178,8 @@ func openAfkArena() error {
 		return err
 	}
 
-	if err := waitUntilGameLoaded(); err != nil {
-		return fmt.Errorf("failed to wait until game loaded: %w", err)
+	if _, err := waitUntilFound(context.TODO(), "img/buttons/begin.png", 0.8, 30*time.Second); err != nil {
+		return fmt.Errorf("failed to find begin.png: %w", err)
 	}
 
 	log.Info("AFK Arena opened successfully!")
@@ -148,69 +193,47 @@ func openAfkArena() error {
 	return nil
 }
 
-func waitUntilGameLoaded() error {
-	log.Info("Waiting for game to load...")
-	// wait 1m with check every 2 seconds
-	for i := 0; i < 30; i++ {
-		visible, err := isVisible("buttons/campaign_selected")
-		if err != nil {
-			return err
-		}
-		if visible {
-			return nil
-		}
-		time.Sleep(2 * time.Second)
-	}
-
-	return fmt.Errorf("game failed to load")
-}
-
-func clickButton(button string) error {
-	err := clickImage(fmt.Sprintf("buttons/%s_selected", button), 0.8)
-	if err != nil {
-		return clickImage(fmt.Sprintf("buttons/%s_unselected", button), 0.8)
-	}
-	return nil
-}
-
-func confirmLocation(location string) error {
-	log.Info("Confirming location...", "location", location)
-	inLocation, err := isVisible(fmt.Sprintf("buttons/%s_selected", location))
-	if err != nil {
-		return fmt.Errorf("failed to check if in campaign: %w", err)
-	}
-
-	//click campaign if not in campaign until in campaign, max 5 times
-	for i := 0; i < 5 && !inLocation; i++ {
-		if err = clickButton(location); err != nil {
-			return fmt.Errorf("failed to click button: %w", err)
-		}
-		inLocation, err = isVisible(fmt.Sprintf("buttons/%s_selected", location))
-		if err != nil {
-			return fmt.Errorf("failed to check if in campaign: %w", err)
-		}
-		time.Sleep(defaultWait)
-	}
-
-	if !inLocation {
-		return fmt.Errorf("not in %s", location)
-	}
-
-	return nil
-}
+//func confirmLocation(location string) error {
+//	log.Info("Confirming location...", "location", location)
+//	_, found := findInScreen(fmt.Sprintf("./img/buttons/%s_selected.png", location), 0.8)
+//
+//	//click campaign if not in campaign until in campaign, max 5 times
+//	for i := 0; i < 5 && !found; i++ {
+//		err := clickImage(fmt.Sprintf("buttons/%s_unselected", location), 0.8)
+//		if err != nil {
+//			return fmt.Errorf("failed to click campaign: %w", err)
+//		}
+//		_, found = findInScreen(fmt.Sprintf("./img/buttons/%s_selected.png", location), 0.8)
+//	}
+//
+//	if !found {
+//		return fmt.Errorf("not in %s", location)
+//	}
+//
+//	return nil
+//}
 
 func expandMenus() error {
-	for {
-		visible, err := isVisible("buttons/downarrow")
-		if err != nil {
-			return err
-		}
-		if !visible {
-			return nil
-		}
-		if err := clickImage("buttons/downarrow", 0.8); err != nil {
-			return err
-		}
-		time.Sleep(defaultWait)
+	arrows, b := findAllInScreen("./img/buttons/downarrow.png", 0.8)
+	if !b {
+		return nil
 	}
+
+	for _, arrow := range arrows {
+		if err := clickXY(arrow.X, arrow.Y); err != nil {
+			return fmt.Errorf("failed to click down arrow: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func getLowestImagePoint(points []image.Point) image.Point {
+	lowest := points[0]
+	for _, point := range points {
+		if point.Y > lowest.Y {
+			lowest = point
+		}
+	}
+	return lowest
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -9,31 +10,27 @@ import (
 
 func claimAfkRewards() error {
 	log.Info("Claiming afk rewards...")
-	if err := clickXYDefault(maxX/2, int(float64(maxY)*0.8)); err != nil {
+	if err := clickXY(maxX/2, int(float64(maxY)*0.8)); err != nil {
 		return fmt.Errorf("failed to click on afk rewards: %w", err)
 	}
 
-	if err := clickImage("buttons/collect", 0.8); err != nil {
-		return fmt.Errorf("failed to click on collect: %w", err)
-	}
-
-	return confirmLocation("campaign")
+	return waitUntilFoundAndClick(context.TODO(), "img/buttons/collect.png", 0.8, 10*time.Second)
 }
 
 func claimFastRewards(times int) error {
 	log.Info("Claiming fast rewards...")
 
-	if err := clickImage("buttons/fastrewards", 0.8); err != nil {
+	if err := waitUntilFoundAndClick(context.TODO(), "img/buttons/fastrewards.png", 0.8, 10*time.Second); err != nil {
 		return fmt.Errorf("failed to click on fast rewards: %w", err)
 	}
 	for i := 0; i < times; i++ {
 		// Submit
-		if err := clickXYDefault(700, 1500); err != nil {
+		if err := clickXY(700, 1500); err != nil {
 			return fmt.Errorf("failed to submit fast rewards: %w", err)
 		}
 		time.Sleep(defaultWait)
 		// Claim fast rewards
-		if err := clickXYDefault(932, 2140); err != nil {
+		if err := clickXY(932, 2140); err != nil {
 			return fmt.Errorf("failed to claim fast rewards: %w", err)
 		}
 	}
@@ -42,7 +39,7 @@ func claimFastRewards(times int) error {
 		return fmt.Errorf("failed to close fast rewards: %w", err)
 	}
 
-	return confirmLocation("campaign")
+	return nil
 }
 
 func claimMail() error {
@@ -53,16 +50,15 @@ func claimMail() error {
 	if err := clickImage("buttons/collect_all", 0.8); err != nil {
 		return fmt.Errorf("failed to click on collect: %w", err)
 	}
-	time.Sleep(defaultWait)
-	// Claim fast rewards
-	if err := clickXYDefault(932, 2140); err != nil {
-		return fmt.Errorf("failed to claim fast rewards: %w", err)
+	err := clickImage("buttons/back", 0.8)
+	if err == nil {
+		return nil
 	}
-	if err := clickImage("buttons/back", 0.8); err != nil {
-		return fmt.Errorf("failed to click on collect: %w", err)
+	if err = clickXY(safePoint.X, safePoint.Y); err != nil { // skip rewards
+		return err
 	}
 
-	return confirmLocation("campaign")
+	return clickImage("buttons/back", 0.8)
 }
 
 func collectCompanionPoints() error {
@@ -73,11 +69,8 @@ func collectCompanionPoints() error {
 	if err := clickImage("buttons/sendandreceive", 0.8); err != nil {
 		return fmt.Errorf("failed to click on send and receive: %w", err)
 	}
-	if err := clickImage("buttons/back", 0.8); err != nil {
-		return fmt.Errorf("failed to click on exit menu: %w", err)
-	}
 
-	return confirmLocation("campaign")
+	return clickImage("buttons/back", 0.8)
 }
 
 // def attemptCampaign():
@@ -103,31 +96,25 @@ func collectCompanionPoints() error {
 //	    recover()
 func attemptCampaign() error {
 	log.Info("Attempting Campaign battle")
-	if err := confirmLocation("campaign"); err != nil {
-		return fmt.Errorf("failed to confirm location: %w", err)
-	}
 	if err := clickImage("buttons/begin", 0.8); err != nil {
 		return fmt.Errorf("failed to click on begin: %w", err)
 	}
-	time.Sleep(2 * time.Second)
-	if err := clickImage("buttons/begin_plain", 0.8); err != nil {
-		return fmt.Errorf("failed to click on begin: %w", err)
+	err := waitUntilFoundAndClick(context.Background(), "img/buttons/begin_plain.png", 0.8, 10*time.Second)
+	if err != nil {
+		return err
 	}
-	if err := clickImage("buttons/beginbattle", 0.8); err != nil {
+	if err = clickImage("buttons/beginbattle", 0.8); err != nil {
 		return fmt.Errorf("failed to click on beginbattle: %w", err)
 	}
-	time.Sleep(2 * time.Second)
-	if err := clickImage("buttons/pause", 0.8); err != nil {
-		return fmt.Errorf("failed to click on pause: %w", err)
+	err = waitUntilFoundAndClick(context.Background(), "img/buttons/pause.png", 0.8, 10*time.Second)
+	if err != nil {
+		return err
 	}
-	if err := clickImage("buttons/exitbattle", 0.8); err != nil {
+	if err = clickImage("buttons/exitbattle", 0.8); err != nil {
 		return fmt.Errorf("failed to click on exitbattle: %w", err)
 	}
-	if err := clickImage("buttons/back", 0.8); err != nil {
+	if err = clickImage("buttons/back", 0.8); err != nil {
 		return fmt.Errorf("failed to click on back: %w", err)
-	}
-	if err := confirmLocation("campaign"); err != nil {
-		return fmt.Errorf("failed to confirm location: %w", err)
 	}
 	return nil
 }
@@ -155,9 +142,6 @@ func attemptCampaign() error {
 //	    recover()
 func handleBounties() error {
 	log.Info("Handling Bounty Board")
-	if err := confirmLocation("darkforest"); err != nil {
-		return fmt.Errorf("failed to confirm location: %w", err)
-	}
 	if err := clickImage("buttons/bountyboard", 0.8); err != nil {
 		return fmt.Errorf("failed to click on bounty board: %w", err)
 	}
@@ -180,10 +164,10 @@ func handleBounties() error {
 		log.Error("No team bounties to collect")
 	}
 	if err := clickImage("buttons/dispatch2", 0.8); err != nil {
-		return fmt.Errorf("failed to click on dispatch: %w", err)
+		log.Error("No team bounties to dispatch")
 	}
 	if err := clickImage("buttons/confirm", 0.8); err != nil {
-		return fmt.Errorf("failed to click on confirm: %w", err)
+		log.Error("No team bounties to confirm")
 	}
 	if err := clickImage("buttons/back", 0.8); err != nil {
 		return fmt.Errorf("failed to click on back: %w", err)
@@ -225,27 +209,34 @@ func handleBounties() error {
 func handleArenaOfHeroes(count int) error {
 	counter := 0
 	log.Info("Battling Arena of Heroes ", count, " times")
-	if err := confirmLocation("darkforest"); err != nil {
-		return fmt.Errorf("failed to confirm location: %w", err)
-	}
-	if err := clickXYDefault(740, 1312); err != nil {
+	if err := clickXY(740, 1312); err != nil {
 		return fmt.Errorf("failed to click on arena of heroes: %w", err)
 	}
-	if err := clickXYDefault(550, 1050); err != nil {
+	if err := clickXY(550, 1050); err != nil {
 		return fmt.Errorf("failed to click on arena of heroes: %w", err)
 	}
 	if err := clickImage("labels/arenaofheroes_new", 0.8); err != nil {
-		return fmt.Errorf("failed to click on arena of heroes: %w", err)
+		log.Error("No arena of heroes found")
 	}
 	if err := clickImage("buttons/challenge", 0.8); err != nil {
 		return fmt.Errorf("failed to click on challenge: %w", err)
 	}
 	for counter < count {
-		time.Sleep(1 * time.Second)
-		if err := clickImage("buttons/arenafight", 0.8); err != nil {
-			return fmt.Errorf("failed to click on arenafight: %w", err)
+		images, b := findAllInScreen("img/buttons/arenafight.png", 0.8)
+		if !b {
+			log.Info("No arena fight buttons found")
+			return nil
 		}
-		if err := clickImageWithRetry("buttons/battle", 0.6, 5); err != nil {
+		if len(images) == 1 {
+			break
+		}
+		weakestEnemy := getLowestImagePoint(images)
+		err := clickXY(weakestEnemy.X, weakestEnemy.Y)
+		if err != nil {
+			return err
+		}
+
+		if err := clickImage("buttons/battle", 0.6); err != nil {
 			return fmt.Errorf("failed to click on battle: %w", err)
 		}
 		time.Sleep(2 * time.Second)
@@ -253,11 +244,11 @@ func handleArenaOfHeroes(count int) error {
 			log.Error("No skip button found")
 		}
 		time.Sleep(2 * time.Second)
-		if err := clickXYDefault(600, 687); err != nil {
+		if err := clickXY(600, 687); err != nil {
 			return fmt.Errorf("failed to click on loot popup: %w", err)
 		}
 		time.Sleep(2 * time.Second)
-		if err := clickXYDefault(600, 687); err != nil {
+		if err := clickXY(600, 687); err != nil {
 			return fmt.Errorf("failed to click on loot popup: %w", err)
 		}
 		counter = counter + 1
@@ -293,23 +284,24 @@ func handleArenaOfHeroes(count int) error {
 //	    recover()
 func collectGladiatorCoins() error {
 	log.Info("Collecting Gladiator Coins")
-	if err := confirmLocation("darkforest"); err != nil {
-		return fmt.Errorf("failed to confirm location: %w", err)
-	}
-	if err := clickXYDefault(740, 1312); err != nil {
+	if err := clickXY(740, 1312); err != nil {
 		return fmt.Errorf("failed to click on arena of heroes: %w", err)
 	}
-	//if err := clickXYDefault(550, 1050); err != nil {
+	//if err := clickXY(550, 1050); err != nil {
 	//	return fmt.Errorf("failed to click on arena of heroes: %w", err)
 	//}
 	if err := clickImage("labels/legendstournament_new", 0.8); err != nil {
 		return fmt.Errorf("failed to click on legends tournament: %w", err)
 	}
-	if err := clickXYDefault(550, 375); err != nil {
+	time.Sleep(2 * time.Second)
+	if err := clickXY(550, 375); err != nil {
 		return fmt.Errorf("failed to click on legends tournament: %w", err)
 	}
-	if err := clickXYDefault(50, 2312); err != nil {
-		return fmt.Errorf("failed to click on legends tournament: %w", err)
+	if err := clickXY(safePoint.X, safePoint.Y); err != nil { // skip rewards
+		return err
+	}
+	if err := clickImage("buttons/back", 0.8); err != nil {
+		return fmt.Errorf("failed to click on back: %w", err)
 	}
 	if err := clickImage("buttons/back", 0.8); err != nil {
 		return fmt.Errorf("failed to click on back: %w", err)
@@ -329,7 +321,7 @@ func collectGladiatorCoins() error {
 //	confirmLocation('ranhorn')
 //	clickXY(800,290, seconds=4)
 //	if isVisible('buttons/manage'):
-//	    while clicks < 10: # We spam clicks in the right area and pray
+//	    while clicks < 10: # We spam clicks in the right area an d pray
 //	        clickXY(x_axis, 1300, seconds=0.5)
 //	        x_axis = x_axis + 50
 //	        clicks = clicks + 1
@@ -343,23 +335,24 @@ func collectInnGifts() error {
 	clicks := 0
 	xAxis := 250
 	log.Info("Attempting daily Inn gift collection")
-	if err := confirmLocation("ranhorn"); err != nil {
-		return fmt.Errorf("failed to confirm location: %w", err)
-	}
-	if err := clickXYDefault(800, 550); err != nil {
+	time.Sleep(2 * time.Second)
+	if err := clickXY(800, 550); err != nil {
 		return fmt.Errorf("failed to click on inn: %w", err)
 	}
-	time.Sleep(4 * time.Second)
-	if exists, err := isVisible("buttons/manage"); err != nil || !exists {
-		return fmt.Errorf("failed to check if in inn: %w", err)
+	_, err := waitUntilFound(context.Background(), "img/buttons/manage.png", 0.8, 10*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to find manage: %w", err)
 	}
+
 	for clicks < 10 {
-		if err := clickXYDefault(xAxis, 1630); err != nil {
+		time.Sleep(500 * time.Millisecond)
+		if err := clickXY(xAxis, 1800); err != nil {
 			return fmt.Errorf("failed to click on inn: %w", err)
 		}
 		xAxis = xAxis + 50
 		clicks = clicks + 1
-		if err := clickXYDefault(550, 1400/1920*2400); err != nil {
+		time.Sleep(500 * time.Millisecond)
+		if err := clickXY(550, 1750); err != nil {
 			return fmt.Errorf("failed to click on inn: %w", err)
 		}
 	}
