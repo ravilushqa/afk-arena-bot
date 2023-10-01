@@ -65,6 +65,7 @@ func findInScreen(templateImagePath string, confidence float32) (*image.Point, b
 
 	// Find the maximum value and its location in the result matrix
 	_, maxVal, _, maxLoc := gocv.MinMaxLoc(result)
+	log.Info(templateImagePath, "maxVal", maxVal)
 
 	if maxVal >= confidence {
 		// Calculate the middle point of the found template
@@ -72,6 +73,9 @@ func findInScreen(templateImagePath string, confidence float32) (*image.Point, b
 		midY := maxLoc.Y + templateImg.Rows()/2
 		return &image.Point{X: midX, Y: midY}, true
 	}
+
+	// save screen to debug folder
+	gocv.IMWrite(fmt.Sprintf("./debug/%d.png", time.Now().Nanosecond()), mainImg)
 
 	return nil, false
 }
@@ -169,7 +173,7 @@ func clickXY(x, y int) error {
 }
 
 func clickImage(imagePath string, confidence float32) error {
-	return waitUntilFoundAndClick(context.Background(), fmt.Sprintf("./img/%s.png", imagePath), confidence, 5*time.Second)
+	return waitUntilFoundAndClick(context.Background(), fmt.Sprintf("./img/%s.png", imagePath), confidence, 10*time.Second)
 }
 
 func openAfkArena() error {
@@ -192,26 +196,6 @@ func openAfkArena() error {
 
 	return nil
 }
-
-//func confirmLocation(location string) error {
-//	log.Info("Confirming location...", "location", location)
-//	_, found := findInScreen(fmt.Sprintf("./img/buttons/%s_selected.png", location), 0.8)
-//
-//	//click campaign if not in campaign until in campaign, max 5 times
-//	for i := 0; i < 5 && !found; i++ {
-//		err := clickImage(fmt.Sprintf("buttons/%s_unselected", location), 0.8)
-//		if err != nil {
-//			return fmt.Errorf("failed to click campaign: %w", err)
-//		}
-//		_, found = findInScreen(fmt.Sprintf("./img/buttons/%s_selected.png", location), 0.8)
-//	}
-//
-//	if !found {
-//		return fmt.Errorf("not in %s", location)
-//	}
-//
-//	return nil
-//}
 
 func expandMenus() error {
 	arrows, b := findAllInScreen("./img/buttons/downarrow.png", 0.8)

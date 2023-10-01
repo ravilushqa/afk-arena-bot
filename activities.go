@@ -36,7 +36,8 @@ func claimFastRewards(times int) error {
 	}
 
 	if err := clickImage("buttons/close", 0.8); err != nil {
-		return fmt.Errorf("failed to close fast rewards: %w", err)
+		_ = clickXY(safePoint.X, safePoint.Y)
+		return clickImage("buttons/close", 0.8)
 	}
 
 	return nil
@@ -215,6 +216,8 @@ func handleArenaOfHeroes(count int) error {
 	if err := clickXY(550, 1050); err != nil {
 		return fmt.Errorf("failed to click on arena of heroes: %w", err)
 	}
+	_ = clickXY(safePoint.X, safePoint.Y)
+
 	if err := clickImage("labels/arenaofheroes_new", 0.8); err != nil {
 		log.Error("No arena of heroes found")
 	}
@@ -222,6 +225,10 @@ func handleArenaOfHeroes(count int) error {
 		return fmt.Errorf("failed to click on challenge: %w", err)
 	}
 	for counter < count {
+		_, err := waitUntilFound(context.TODO(), "img/buttons/arenafight.png", 0.8, 5*time.Second)
+		if err != nil {
+			return fmt.Errorf("failed to find arena fight: %w", err)
+		}
 		images, b := findAllInScreen("img/buttons/arenafight.png", 0.8)
 		if !b {
 			log.Info("No arena fight buttons found")
@@ -231,7 +238,7 @@ func handleArenaOfHeroes(count int) error {
 			break
 		}
 		weakestEnemy := getLowestImagePoint(images)
-		err := clickXY(weakestEnemy.X, weakestEnemy.Y)
+		err = clickXY(weakestEnemy.X, weakestEnemy.Y)
 		if err != nil {
 			return err
 		}
@@ -243,14 +250,13 @@ func handleArenaOfHeroes(count int) error {
 		if err := clickImage("buttons/skip", 0.8); err != nil {
 			log.Error("No skip button found")
 		}
-		time.Sleep(2 * time.Second)
-		if err := clickXY(600, 687); err != nil {
-			return fmt.Errorf("failed to click on loot popup: %w", err)
+		if err = waitUntilFoundAndClick(context.Background(), "img/labels/rewards.png", 0.8, 10*time.Second); err != nil {
+			log.Error("No rewards labels found")
 		}
-		time.Sleep(2 * time.Second)
-		if err := clickXY(600, 687); err != nil {
-			return fmt.Errorf("failed to click on loot popup: %w", err)
+		if err = waitUntilFoundAndClick(context.Background(), "img/labels/taptocontinue.png", 0.8, 10*time.Second); err != nil {
+			log.Error("No tap to continue labels found")
 		}
+
 		counter = counter + 1
 	}
 	if err := clickImage("buttons/exitmenu", 0.8); err != nil {
@@ -356,6 +362,40 @@ func collectInnGifts() error {
 			return fmt.Errorf("failed to click on inn: %w", err)
 		}
 	}
+	if err := clickImage("buttons/back", 0.8); err != nil {
+		return fmt.Errorf("failed to click on back: %w", err)
+	}
+
+	return nil
+}
+
+func handleShopPurchase(refreshCount int) error {
+	log.Info("Handling shop purchase")
+	if err := clickImage("buttons/shop/shop", 0.8); err != nil {
+		return fmt.Errorf("failed to click on shop: %w", err)
+	}
+
+	for i := 0; i < refreshCount; i++ {
+		if err := waitUntilFoundAndClick(context.TODO(), "img/buttons/shop/quickbuy.jpg", 0.8, 5*time.Second); err != nil {
+			return fmt.Errorf("failed to click on quick buy: %w", err)
+		}
+		if err := waitUntilFoundAndClick(context.TODO(), "img/buttons/shop/purchase.png", 0.8, 5*time.Second); err != nil {
+			return fmt.Errorf("failed to click on purchase: %w", err)
+		}
+		if err := waitUntilFoundAndClick(context.Background(), "img/labels/rewards.png", 0.8, 5*time.Second); err != nil {
+			log.Error("No rewards labels found")
+		}
+		if i == refreshCount-1 {
+			break
+		}
+		if err := waitUntilFoundAndClick(context.Background(), "img/buttons/shop/refresh.jpg", 0.8, 5*time.Second); err != nil {
+			log.Error("No rewards labels found")
+		}
+		if err := clickImage("buttons/confirm", 0.8); err != nil {
+			return fmt.Errorf("failed to click on shop: %w", err)
+		}
+	}
+
 	if err := clickImage("buttons/back", 0.8); err != nil {
 		return fmt.Errorf("failed to click on back: %w", err)
 	}
