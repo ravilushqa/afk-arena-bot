@@ -13,11 +13,11 @@ import (
 var (
 	maxX            = 1080
 	maxY            = 2400
-	fastRewardTimes = 0
-	defaultWait     = 1 * time.Second
-	arenaCount      = 5
-	safePoint       = image.Point{X: maxX, Y: 0}
-	shopRefresh     = 0
+	fastRewardTimes = 5
+	defaultWait     = 2 * time.Second
+	arenaCount      = 1
+	safePoint       = image.Point{X: maxX / 2, Y: 0}
+	shopRefresh     = 3
 )
 
 func main() {
@@ -88,6 +88,16 @@ func main() {
 
 	if err = handleShopPurchase(shopRefresh); err != nil {
 		log.Error("Failed to handle shop purchase:", err)
+		return
+	}
+
+	if err = handleGuildHunts(); err != nil {
+		log.Error("Failed to handle guild hunts:", err)
+		return
+	}
+
+	if err = collectQuests(); err != nil {
+		log.Error("Failed to collect quests:", err)
 		return
 	}
 

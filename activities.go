@@ -51,15 +51,16 @@ func claimMail() error {
 	if err := clickImage("buttons/collect_all", 0.8); err != nil {
 		return fmt.Errorf("failed to click on collect: %w", err)
 	}
-	err := clickImage("buttons/back", 0.8)
-	if err == nil {
-		return nil
-	}
-	if err = clickXY(safePoint.X, safePoint.Y); err != nil { // skip rewards
-		return err
+
+	// click back until we are back at the main screen
+	for {
+		_ = clickXY(safePoint.X, safePoint.Y)
+		if err := clickImage("buttons/back", 0.8); err != nil {
+			break
+		}
 	}
 
-	return clickImage("buttons/back", 0.8)
+	return nil
 }
 
 func collectCompanionPoints() error {
@@ -70,31 +71,18 @@ func collectCompanionPoints() error {
 	if err := clickImage("buttons/sendandreceive", 0.8); err != nil {
 		return fmt.Errorf("failed to click on send and receive: %w", err)
 	}
+	err := clickImage("buttons/back", 0.8)
+	if err != nil {
+		log.Info("No back button found")
+	}
+	err = clickImage("buttons/back", 0.8)
+	if err != nil {
+		log.Info("No back button found")
+	}
 
-	return clickImage("buttons/back", 0.8)
+	return nil
 }
 
-// def attemptCampaign():
-//
-//	printBlue('Attempting Campaign battle')
-//	confirmLocation('campaign')
-//	click('buttons/begin', seconds=2)
-//	if (isVisible('buttons/begin', 0.7)): # If we see second Begin it's a multi so we take different actions
-//	    click('buttons/begin', 0.7, seconds=2)
-//	    click('buttons/beginbattle', seconds=4)
-//	    click('buttons/pause', retry=3) # 3 retries as ulting heroes can cover the button
-//	    click('buttons/exitbattle')
-//	    click('buttons/back')
-//	else: # else it's a single battle
-//	    click('buttons/battle', 0.8, retry=3, seconds=3)
-//	    click('buttons/battle_large', 0.8, suppress=True) #If you have no autobattle button its larger
-//	    click('buttons/pause', 0.8, retry=3) # 3 retries as ulting heroes can cover the button
-//	    click('buttons/exitbattle')
-//	if confirmLocation('campaign', bool=True):
-//	    printGreen('    Campaign attempted successfully')
-//	else:
-//	    printError('    Something went wrong, attempting to recover')
-//	    recover()
 func attemptCampaign() error {
 	log.Info("Attempting Campaign battle")
 	if err := clickImage("buttons/begin", 0.8); err != nil {
@@ -120,27 +108,6 @@ func attemptCampaign() error {
 	return nil
 }
 
-// def handleBounties():
-//
-//	printBlue('Handling Bounty Board')
-//	confirmLocation('darkforest')
-//	clickXY(600, 1320)
-//	if (isVisible('labels/bountyboard')):
-//	    clickXY(650, 1700) # Solo tab
-//	    click('buttons/collect_all', seconds=2, suppress=True)
-//	    if config.getboolean('DAILIES', 'solobounties') is True:
-//	        wait()
-//	        click('buttons/dispatch', confidence=0.8, suppress=True, grayscale=True)
-//	        click('buttons/confirm', suppress=True)
-//	    clickXY(950,1700) # Team tab
-//	    click('buttons/collect_all', seconds=2, suppress=True)
-//	    click('buttons/dispatch', confidence=0.8, suppress=True, grayscale=True)
-//	    click('buttons/confirm', suppress=True)
-//	    click('buttons/back')
-//	    printGreen('    Bounties attempted successfully')
-//	else:
-//	    printError('    Bounty Board not found, attempting to recover')
-//	    recover()
 func handleBounties() error {
 	log.Info("Handling Bounty Board")
 	if err := clickImage("buttons/bountyboard", 0.8); err != nil {
@@ -177,36 +144,6 @@ func handleBounties() error {
 	return nil
 }
 
-// def handleArenaOfHeroes(count):
-//
-//	counter = 0
-//	printBlue('Battling Arena of Heroes ' + str(count) + ' times')
-//	confirmLocation('darkforest')
-//	clickXY(740, 1050)
-//	clickXY(550, 50)
-//	if isVisible('labels/arenaofheroes_new'): # The label font changes for reasons
-//	    click('labels/arenaofheroes_new', suppress=True)
-//	    click('buttons/challenge', retry=3) # retries for animated button
-//	    while counter < count:
-//	        wait(1) # To avoid error when clickMultipleChoice returns no results
-//	        clickMultipleChoice('buttons/arenafight', 4, confidence=0.98) # Select 4th opponent
-//	        click('buttons/battle', 0.6, retry=3, suppress=True) # lower confidence as it's an animated button
-//	        wait(2)
-//	        click('buttons/skip', retry=5, suppress=True) # Retries as ulting heros can cover the button
-//	        if (isVisible('labels/defeat')):
-//	            printError('    Battle #' + str(counter+1) + ' Defeat!')
-//	        else:
-//	            printGreen('    Battle #' + str(counter+1) + ' Victory!')
-//	            clickXY(600, 550) # Clear loot popup
-//	        clickXY(600, 550)
-//	        counter = counter+1
-//	    click('buttons/exitmenu')
-//	    click('buttons/back')
-//	    click('buttons/back')
-//	    printGreen('    Arena battles complete')
-//	else:
-//	    printError('Arena of Heroes not found, attempting to recover')
-//	    recover()
 func handleArenaOfHeroes(count int) error {
 	counter := 0
 	log.Info("Battling Arena of Heroes ", count, " times")
@@ -216,7 +153,10 @@ func handleArenaOfHeroes(count int) error {
 	if err := clickXY(550, 1050); err != nil {
 		return fmt.Errorf("failed to click on arena of heroes: %w", err)
 	}
-	_ = clickXY(safePoint.X, safePoint.Y)
+
+	if err := waitUntilFoundAndClick(context.Background(), "img/labels/rewards.png", 0.7, 5*time.Second); err != nil {
+		log.Error("No rewards labels found")
+	}
 
 	if err := clickImage("labels/arenaofheroes_new", 0.8); err != nil {
 		log.Error("No arena of heroes found")
@@ -250,7 +190,7 @@ func handleArenaOfHeroes(count int) error {
 		if err := clickImage("buttons/skip", 0.8); err != nil {
 			log.Error("No skip button found")
 		}
-		if err = waitUntilFoundAndClick(context.Background(), "img/labels/rewards.png", 0.8, 10*time.Second); err != nil {
+		if err = waitUntilFoundAndClick(context.Background(), "img/labels/rewards.png", 0.7, 10*time.Second); err != nil {
 			log.Error("No rewards labels found")
 		}
 		if err = waitUntilFoundAndClick(context.Background(), "img/labels/taptocontinue.png", 0.8, 10*time.Second); err != nil {
@@ -272,22 +212,6 @@ func handleArenaOfHeroes(count int) error {
 	return nil
 }
 
-// def collectGladiatorCoins():
-//
-//	printBlue('Collecting Gladiator Coins')
-//	confirmLocation('darkforest')
-//	clickXY(740, 1050)
-//	clickXY(550, 50)
-//	if isVisible('labels/legendstournament_new'): # The label font changes for reasons
-//	    click('labels/legendstournament_new', suppress=True)
-//	    clickXY(550, 300, seconds=2)
-//	    clickXY(50, 1850)
-//	    click('buttons/back')
-//	    click('buttons/back')
-//	    printGreen('    Gladiator Coins collected')
-//	else:
-//	    printError('    Legends Tournament not found, attempting to recover')
-//	    recover()
 func collectGladiatorCoins() error {
 	log.Info("Collecting Gladiator Coins")
 	if err := clickXY(740, 1312); err != nil {
@@ -319,24 +243,6 @@ func collectGladiatorCoins() error {
 	return nil
 }
 
-// def collectInnGifts():
-//
-//	clicks = 0
-//	x_axis = 250
-//	printBlue('Attempting daily Inn gift collection')
-//	confirmLocation('ranhorn')
-//	clickXY(800,290, seconds=4)
-//	if isVisible('buttons/manage'):
-//	    while clicks < 10: # We spam clicks in the right area an d pray
-//	        clickXY(x_axis, 1300, seconds=0.5)
-//	        x_axis = x_axis + 50
-//	        clicks = clicks + 1
-//	        clickXY(550, 1400, seconds=0.5) # Clear loot
-//	    click('buttons/back')
-//	    printGreen('    Inn Gifts collected.')
-//	else:
-//	    printError('    Inn not found, attempting to recover')
-//	    recover()
 func collectInnGifts() error {
 	clicks := 0
 	xAxis := 250
@@ -401,4 +307,79 @@ func handleShopPurchase(refreshCount int) error {
 	}
 
 	return nil
+}
+
+func handleGuildHunts() error {
+	log.Info("Attempting to run Guild Hunts")
+	if err := clickImage("buttons/guild", 0.8); err != nil {
+		return fmt.Errorf("failed to click on guild: %w", err)
+	}
+	if err := clickImage("buttons/guildhunting", 0.8); err != nil {
+		return fmt.Errorf("failed to click on guild: %w", err)
+	}
+
+	if err := clickImage("buttons/quickbattle", 0.8); err != nil {
+		log.Error("No quick battle found")
+	}
+	if err := clickImage("buttons/sweep", 0.8); err != nil {
+		log.Error("No quick battle found")
+	}
+	if err := clickImage("buttons/confirm", 0.8); err != nil {
+		log.Error("No confirm button found")
+	}
+
+	if err := clickXY(safePoint.X, safePoint.Y); err != nil {
+		log.Error("No quick battle found")
+	}
+
+	if err := clickXY(safePoint.X, safePoint.Y); err != nil {
+		log.Error("No quick battle found")
+	}
+
+	if err := clickImage("buttons/arrow_right", 0.8); err != nil {
+		log.Error("No quick battle found")
+	}
+
+	if err := clickImage("buttons/quickbattle", 0.8); err != nil {
+		log.Error("No quick battle found")
+	}
+	if err := clickImage("buttons/sweep", 0.8); err != nil {
+		log.Error("No quick battle found")
+	}
+
+	if err := clickImage("buttons/confirm", 0.8); err != nil {
+		log.Error("No confirm button found")
+	}
+
+	for i := 0; i < 5; i++ {
+		_ = clickXY(safePoint.X, safePoint.Y)
+		_, found := findInScreen("img/buttons/back.png", 0.8)
+		if found {
+			break
+		}
+
+	}
+
+	for {
+		if err := clickImage("buttons/back", 0.8); err != nil {
+			break
+		}
+	}
+	return nil
+}
+
+func collectQuests() error {
+	log.Info("Attempting to collect quests")
+	//if err := clickImage("buttons/quest", 0.8); err != nil {
+	//	return fmt.Errorf("failed to click on quests: %w", err)
+	//}
+	//if err := clickImage("buttons/collect", 0.7); err != nil {
+	//	return fmt.Errorf("failed to click on collect: %w", err)
+	//}
+	//if err := clickImage("buttons/fullquestchest", 0.8); err != nil {
+	//	return fmt.Errorf("failed to click on fullquestchest: %w", err)
+	//}
+	_ = clickXY(safePoint.X, safePoint.Y)
+
+	return clickImage("buttons/back", 0.8)
 }
