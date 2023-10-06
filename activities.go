@@ -314,6 +314,14 @@ func handleGuildHunts() error {
 	if err := clickImage("buttons/guild", 0.8); err != nil {
 		return fmt.Errorf("failed to click on guild: %w", err)
 	}
+
+	if err := clickImage("buttons/fortune_chest", 0.7); err != nil {
+		fmt.Println("No fortune chest found")
+	}
+	if err := clickImage("buttons/exitmenu", 0.8); err != nil {
+		fmt.Println("No exit menu found")
+	}
+
 	if err := clickImage("buttons/guildhunting", 0.8); err != nil {
 		return fmt.Errorf("failed to click on guild: %w", err)
 	}
@@ -370,15 +378,16 @@ func handleGuildHunts() error {
 
 func collectQuests() error {
 	log.Info("Attempting to collect quests")
-	//if err := clickImage("buttons/quest", 0.8); err != nil {
-	//	return fmt.Errorf("failed to click on quests: %w", err)
-	//}
-	//if err := clickImage("buttons/collect", 0.7); err != nil {
-	//	return fmt.Errorf("failed to click on collect: %w", err)
-	//}
-	//if err := clickImage("buttons/fullquestchest", 0.8); err != nil {
-	//	return fmt.Errorf("failed to click on fullquestchest: %w", err)
-	//}
+	if err := clickImage("buttons/quest", 0.8); err != nil {
+		return fmt.Errorf("failed to click on quests: %w", err)
+	}
+	if err := clickImage("buttons/collect", 0.7); err != nil {
+		return fmt.Errorf("failed to click on collect: %w", err)
+	}
+	if err := clickImage("buttons/fullquestchest", 0.8); err != nil {
+		return fmt.Errorf("failed to click on fullquestchest: %w", err)
+	}
+	time.Sleep(2 * time.Second)
 	_ = clickXY(safePoint.X, safePoint.Y)
 
 	return clickImage("buttons/back", 0.8)
