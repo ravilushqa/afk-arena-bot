@@ -291,6 +291,7 @@ func handleShopPurchase(refreshCount int) error {
 		if err := waitUntilFoundAndClick(context.Background(), "img/labels/rewards.png", 0.8, 5*time.Second); err != nil {
 			log.Error("No rewards labels found")
 		}
+		_ = clickXY(safePoint.X, safePoint.Y)
 		if i == refreshCount-1 {
 			break
 		}
