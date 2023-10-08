@@ -316,8 +316,8 @@ func handleGuildHunts() error {
 		return fmt.Errorf("failed to click on guild: %w", err)
 	}
 
-	if err := clickImage("buttons/fortune_chest", 0.7); err != nil {
-		fmt.Println("No fortune chest found")
+	if err := waitUntilFoundAndClick(context.Background(), "img/buttons/fortune_chest.png", 0.7, 10*time.Second); err != nil {
+		log.Error("No fortune chest found")
 	}
 	if err := clickImage("buttons/exitmenu", 0.8); err != nil {
 		fmt.Println("No exit menu found")
