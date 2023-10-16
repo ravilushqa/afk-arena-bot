@@ -21,6 +21,7 @@ var (
 )
 
 func main() {
+	//panic(buyTempleOfTime())
 	var err error
 	log.Info("Starting Afk Arena Bot")
 	err = openAfkArena()

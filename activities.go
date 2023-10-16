@@ -393,3 +393,21 @@ func collectQuests() error {
 
 	return clickImage("buttons/back", 0.8)
 }
+
+func buyTempleOfTime() error {
+	log.Info("Attempting to buy Temple of Time")
+
+	time.Sleep(5 * time.Second)
+
+	for {
+		if err := clickImage("buttons/summon", 0.8); err != nil {
+			return fmt.Errorf("failed to click on summon: %w", err)
+		}
+		if err := clickImage("buttons/card", 0.8); err != nil {
+			return fmt.Errorf("failed to click on card: %w", err)
+		}
+		if err := clickImage("buttons/back", 0.8); err != nil {
+			return fmt.Errorf("failed to click on card: %w", err)
+		}
+	}
+}
