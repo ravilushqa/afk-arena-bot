@@ -88,13 +88,13 @@ func attemptCampaign() error {
 	if err := clickImage("buttons/begin", 0.8); err != nil {
 		return fmt.Errorf("failed to click on begin: %w", err)
 	}
-	err := waitUntilFoundAndClick(context.Background(), "img/buttons/begin_plain.png", 0.8, 10*time.Second)
+	err := waitUntilFoundAndClick(context.Background(), "img/buttons/battle.png", 0.8, 10*time.Second)
 	if err != nil {
 		return err
 	}
-	if err = clickImage("buttons/beginbattle", 0.8); err != nil {
-		return fmt.Errorf("failed to click on beginbattle: %w", err)
-	}
+	//if err = clickImage("buttons/beginbattle", 0.8); err != nil {
+	//	return fmt.Errorf("failed to click on beginbattle: %w", err)
+	//}
 	err = waitUntilFoundAndClick(context.Background(), "img/buttons/pause.png", 0.8, 10*time.Second)
 	if err != nil {
 		return err
@@ -102,9 +102,9 @@ func attemptCampaign() error {
 	if err = clickImage("buttons/exitbattle", 0.8); err != nil {
 		return fmt.Errorf("failed to click on exitbattle: %w", err)
 	}
-	if err = clickImage("buttons/back", 0.8); err != nil {
-		return fmt.Errorf("failed to click on back: %w", err)
-	}
+	//if err = clickImage("buttons/back", 0.8); err != nil {
+	//	return fmt.Errorf("failed to click on back: %w", err)
+	//}
 	return nil
 }
 
@@ -183,7 +183,7 @@ func handleArenaOfHeroes(count int) error {
 			return err
 		}
 
-		if err := clickImage("buttons/battle", 0.6); err != nil {
+		if err := clickImage("buttons/battle", 0.59); err != nil {
 			return fmt.Errorf("failed to click on battle: %w", err)
 		}
 		time.Sleep(2 * time.Second)
@@ -193,7 +193,7 @@ func handleArenaOfHeroes(count int) error {
 		if err = waitUntilFoundAndClick(context.Background(), "img/labels/rewards.png", 0.7, 10*time.Second); err != nil {
 			log.Error("No rewards labels found")
 		}
-		if err = waitUntilFoundAndClick(context.Background(), "img/labels/taptocontinue.png", 0.8, 10*time.Second); err != nil {
+		if err = waitUntilFoundAndClick(context.Background(), "img/labels/taptocontinue.png", 0.6, 10*time.Second); err != nil {
 			log.Error("No tap to continue labels found")
 		}
 
